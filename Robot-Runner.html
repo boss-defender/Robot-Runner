@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Neon Relay</title>
+  <style>
+    :root {
+      --bg: #08111d;
+      --panel: rgba(9, 18, 31, 0.68);
+      --line: rgba(133, 231, 255, 0.24);
+      --text: #e9fbff;
+      --muted: #98b7c7;
+      --cyan: #5de8ff;
+      --mint: #6dffd0;
+      --coral: #ff6f91;
+      --amber: #ffd166;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 14%, rgba(93, 232, 255, 0.18), transparent 26%),
+        radial-gradient(circle at 82% 72%, rgba(109, 255, 208, 0.12), transparent 30%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .game-shell {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: clamp(10px, 2.4vw, 28px);
+    }
+
+    .stage {
+      position: relative;
+      width: min(1180px, 100%);
+      height: min(720px, 100%);
+      min-height: 420px;
+      overflow: hidden;
+      border: 1px solid rgba(160, 239, 255, 0.25);
+      border-radius: 8px;
+      background: #081522;
+      box-shadow:
+        0 28px 90px rgba(0, 0, 0, 0.44),
+        0 0 60px rgba(93, 232, 255, 0.14),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hud {
+      position: absolute;
+      z-index: 4;
+      top: max(16px, env(safe-area-inset-top));
+      left: max(16px, env(safe-area-inset-left));
+      right: max(16px, env(safe-area-inset-right));
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .score-block,
+    .controls-chip {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(10, 25, 41, 0.78), rgba(10, 16, 28, 0.54));
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+      border-radius: 8px;
+    }
+
+    .score-block {
+      min-width: 154px;
+      padding: 12px 14px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 7px;
+    }
+
+    .score {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 0.9;
+      font-weight: 800;
+      text-shadow: 0 0 22px rgba(93, 232, 255, 0.5);
+    }
+
+    .controls-chip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: min(420px, 52vw);
+      padding: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 26px;
+      height: 23px;
+      padding: 0 7px;
+      border: 1px solid rgba(144, 232, 255, 0.35);
+      border-bottom-color: rgba(144, 232, 255, 0.18);
+      border-radius: 5px;
+      background: rgba(206, 250, 255, 0.08);
+      color: var(--text);
+      font-family: inherit;
+      font-weight: 700;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    .overlay {
+      position: absolute;
+      z-index: 6;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(93, 232, 255, 0.14), transparent 34%),
+        linear-gradient(180deg, rgba(4, 9, 16, 0.26), rgba(4, 9, 16, 0.7));
+      opacity: 1;
+      transition: opacity 220ms ease, visibility 220ms ease;
+      cursor: pointer;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .modal {
+      width: min(520px, 92vw);
+      padding: clamp(20px, 5vw, 34px);
+      border: 1px solid rgba(148, 236, 255, 0.28);
+      border-radius: 8px;
+      background:
+        linear-gradient(145deg, rgba(11, 30, 48, 0.88), rgba(9, 13, 25, 0.82)),
+        radial-gradient(circle at 14% 12%, rgba(109, 255, 208, 0.16), transparent 36%);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), 0 0 58px rgba(93, 232, 255, 0.17);
+      text-align: center;
+      backdrop-filter: blur(22px);
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1,
+    h2 {
+      font-size: clamp(34px, 7vw, 66px);
+      line-height: 0.95;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      font-size: clamp(32px, 6vw, 54px);
+    }
+
+    .accent {
+      color: var(--mint);
+      text-shadow: 0 0 26px rgba(109, 255, 208, 0.48);
+    }
+
+    .subtitle {
+      max-width: 37rem;
+      margin: 14px auto 22px;
+      color: #b8d4df;
+      font-size: clamp(14px, 2.2vw, 17px);
+      line-height: 1.55;
+    }
+
+    .start-pulse {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid rgba(109, 255, 208, 0.42);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(109, 255, 208, 0.08);
+      box-shadow: 0 0 24px rgba(109, 255, 208, 0.17);
+      font-size: 13px;
+      font-weight: 750;
+      text-transform: uppercase;
+      animation: breathe 1.6s ease-in-out infinite;
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    button {
+      min-height: 46px;
+      padding: 0 18px;
+      border: 1px solid rgba(93, 232, 255, 0.36);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(93, 232, 255, 0.2), rgba(109, 255, 208, 0.14));
+      color: var(--text);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      font: 800 13px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+      text-transform: uppercase;
+    }
+
+    button:hover,
+    button:focus-visible {
+      outline: none;
+      border-color: rgba(109, 255, 208, 0.72);
+      box-shadow: 0 0 32px rgba(93, 232, 255, 0.28);
+    }
+
+    .final-score {
+      margin-top: 13px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .touch-controls {
+      position: absolute;
+      z-index: 5;
+      left: max(16px, env(safe-area-inset-left));
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
+      display: none;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .touch-controls button {
+      pointer-events: auto;
+      width: min(160px, 42vw);
+      min-height: 58px;
+      border-color: rgba(148, 236, 255, 0.3);
+      background: rgba(8, 19, 32, 0.58);
+      backdrop-filter: blur(16px);
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: translateY(0); box-shadow: 0 0 20px rgba(109, 255, 208, 0.12); }
+      50% { transform: translateY(-2px); box-shadow: 0 0 34px rgba(109, 255, 208, 0.32); }
+    }
+
+    @media (max-width: 760px), (pointer: coarse) {
+      .game-shell {
+        padding: 0;
+      }
+
+      .stage {
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        border-radius: 0;
+        border: 0;
+      }
+
+      .controls-chip {
+        display: none;
+      }
+
+      .score-block {
+        min-width: 132px;
+        padding: 10px 12px;
+      }
+
+      .touch-controls {
+        display: flex;
+      }
+
+      .modal {
+        margin-bottom: 52px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+    <section class="stage" aria-label="Neon Relay robot runner game">
+      <canvas id="gameCanvas"></canvas>
+
+      <div class="hud">
+        <div class="score-block">
+          <div class="label">Distance</div>
+          <div class="score" id="score">00000</div>
+        </div>
+        <div class="controls-chip" aria-label="Game controls">
+          <span><kbd>Space</kbd> jump / start</span>
+          <span><kbd>B</kbd> slide</span>
+          <span><kbd>R</kbd> restart</span>
+        </div>
+      </div>
+
+      <div class="overlay" id="startOverlay">
+        <div class="modal">
+          <h1>Neon <span class="accent">Relay</span></h1>
+          <p class="subtitle">Sprint a sleek robot through a luminous city track. Jump high barriers, slide under low gates, and keep the rhythm as the world speeds up.</p>
+          <div class="start-pulse"><kbd>Space</kbd> Press Space or Tap to Start</div>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="gameOverOverlay">
+        <div class="modal">
+          <h2>System <span class="accent">Offline</span></h2>
+          <p class="final-score" id="finalScore">Distance 00000</p>
+          <div class="button-row">
+            <button id="restartButton" type="button">Restart Run</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="touch-controls" aria-label="Touch controls">
+        <button id="jumpButton" type="button">Jump / Start</button>
+        <button id="slideButton" type="button">Slide</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const scoreEl = document.getElementById("score");
+      const finalScoreEl = document.getElementById("finalScore");
+      const startOverlay = document.getElementById("startOverlay");
+      const gameOverOverlay = document.getElementById("gameOverOverlay");
+      const restartButton = document.getElementById("restartButton");
+      const jumpButton = document.getElementById("jumpButton");
+      const slideButton = document.getElementById("slideButton");
+
+      const state = {
+        status: "ready",
+        width: 0,
+        height: 0,
+        dpr: 1,
+        groundY: 0,
+        time: 0,
+        score: 0,
+        speed: 455,
+        spawnTimer: 0,
+        nextSpawn: 1.05,
+        shake: 0,
+        flash: 0,
+        slideHeld: false,
+        lastTime: performance.now(),
+        world: 0,
+        obstacles: [],
+        dust: [],
+        sparks: [],
+        stars: [],
+        skyline: []
+      };
+
+      const robot = {
+        x: 0,
+        y: 0,
+        vy: 0,
+        width: 68,
+        height: 100,
+        slideHeight: 54,
+        grounded: true,
+        sliding: false,
+        runPhase: 0,
+        glow: 0
+      };
+
+      function resize() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        state.width = Math.max(320, rect.width);
+        state.height = Math.max(360, rect.height);
+        canvas.width = Math.floor(state.width * state.dpr);
+        canvas.height = Math.floor(state.height * state.dpr);
+        canvas.style.width = `${state.width}px`;
+        canvas.style.height = `${state.height}px`;
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+        state.groundY = Math.round(state.height * 0.74);
+        robot.x = Math.max(66, state.width * 0.14);
+        robot.y = state.groundY - robot.height;
+        buildBackdrop();
+      }
+
+      function buildBackdrop() {
+        state.stars = Array.from({ length: 70 }, (_, i) => ({
+          x: (i * 137) % Math.max(state.width, 1),
+          y: 24 + ((i * 53) % Math.max(state.groundY - 90, 80)),
+          r: 0.8 + ((i * 17) % 16) / 14,
+          a: 0.28 + ((i * 31) % 70) / 100
+        }));
+
+        state.skyline = Array.from({ length: 24 }, (_, i) => ({
+          x: i * 92,
+          w: 46 + ((i * 29) % 58),
+          h: 70 + ((i * 47) % 160),
+          hue: i % 3
+        }));
+      }
+
+      function resetGame() {
+        state.status = "running";
+        state.time = 0;
+        state.score = 0;
+        state.speed = 455;
+        state.spawnTimer = 0;
+        state.nextSpawn = 0.95;
+        state.shake = 0;
+        state.flash = 0;
+        state.slideHeld = false;
+        state.world = 0;
+        state.obstacles = [];
+        state.dust = [];
+        state.sparks = [];
+        robot.y = state.groundY - robot.height;
+        robot.vy = 0;
+        robot.grounded = true;
+        robot.sliding = false;
+        robot.runPhase = 0;
+        scoreEl.textContent = "00000";
+        startOverlay.classList.add("hidden");
+        gameOverOverlay.classList.add("hidden");
+      }
+
+      function endGame() {
+        if (state.status !== "running") return;
+        state.status = "over";
+        state.shake = 18;
+        state.flash = 1;
+        finalScoreEl.textContent = `Distance ${formatScore(state.score)}`;
+        gameOverOverlay.classList.remove("hidden");
+        burst(robot.x + robot.width * 0.55, robot.y + 42, 24);
+      }
+
+      function startOrJump() {
+        if (state.status === "ready") {
+          resetGame();
+          return;
+        }
+        if (state.status === "over") {
+          resetGame();
+          return;
+        }
+        jump();
+      }
+
+      function jump() {
+        if (state.status !== "running" || !robot.grounded) return;
+        robot.vy = -900;
+        robot.grounded = false;
+        robot.sliding = false;
+        state.slideHeld = false;
+        addDust(robot.x + 20, state.groundY - 8, 9, -1);
+      }
+
+      function beginSlide() {
+        if (state.status === "ready") return;
+        if (state.status === "over") {
+          resetGame();
+          return;
+        }
+        if (!robot.grounded) return;
+        if (!state.slideHeld) addDust(robot.x + 18, state.groundY - 8, 11, -1);
+        state.slideHeld = true;
+        robot.sliding = true;
+      }
+
+      function endSlide() {
+        state.slideHeld = false;
+        robot.sliding = false;
+      }
+
+      function spawnObstacle() {
+        const low = Math.random() < Math.min(0.46, 0.34 + state.time * 0.008);
+        const scale = Math.min(1.18, Math.max(0.82, state.width / 980));
+        const obstacle = low
+          ? {
+              type: "low",
+              x: state.width + 46,
+              y: state.groundY - 104 * scale,
+              w: 118 * scale,
+              h: 42 * scale,
+              pulse: Math.random() * 10
+            }
+          : {
+              type: "tall",
+              x: state.width + 46,
+              y: state.groundY - 76 * scale,
+              w: 44 * scale,
+              h: 76 * scale,
+              pulse: Math.random() * 10
+            };
+        state.obstacles.push(obstacle);
+      }
+
+      function update(dt) {
+        const clamped = Math.min(dt, 0.032);
+        state.time += clamped;
+        state.world += state.speed * clamped;
+        state.speed = 455 + Math.min(360, state.time * 15.5);
+        state.score += state.speed * clamped * 0.036;
+        state.spawnTimer += clamped;
+        scoreEl.textContent = formatScore(state.score);
+
+        const spawnWindow = Math.max(0.62, 1.16 - state.time * 0.014);
+        if (state.spawnTimer >= state.nextSpawn) {
+          spawnObstacle();
+          state.spawnTimer = 0;
+          state.nextSpawn = spawnWindow + Math.random() * Math.max(0.18, spawnWindow * 0.48);
+        }
+
+        if (robot.grounded && !robot.sliding) {
+          robot.runPhase += clamped * (11 + state.speed / 98);
+        }
+        robot.glow = 0.5 + Math.sin(state.time * 8) * 0.5;
+        robot.sliding = state.slideHeld && robot.grounded;
+
+        robot.vy += 2400 * clamped;
+        robot.y += robot.vy * clamped;
+        const standingY = state.groundY - robot.height;
+        if (robot.y >= standingY) {
+          if (!robot.grounded) addDust(robot.x + 18, state.groundY - 8, 8, -0.5);
+          robot.y = standingY;
+          robot.vy = 0;
+          robot.grounded = true;
+          robot.sliding = state.slideHeld;
+        }
+
+        for (const obstacle of state.obstacles) {
+          obstacle.x -= state.speed * clamped;
+          obstacle.pulse += clamped * 4;
+        }
+        state.obstacles = state.obstacles.filter((o) => o.x + o.w > -80);
+
+        if (robot.grounded && !robot.sliding && Math.random() < clamped * 18) {
+          addDust(robot.x + 9, state.groundY - 7, 1, 0);
+        }
+        updateParticles(clamped);
+        state.shake = Math.max(0, state.shake - clamped * 46);
+        state.flash = Math.max(0, state.flash - clamped * 2.4);
+
+        const r = robotBounds();
+        for (const obstacle of state.obstacles) {
+          if (intersects(r, obstacleBounds(obstacle))) {
+            endGame();
+            break;
+          }
+        }
+      }
+
+      function robotBounds() {
+        if (robot.sliding && robot.grounded) {
+          return {
+            x: robot.x + 11,
+            y: state.groundY - robot.slideHeight + 9,
+            w: robot.width - 15,
+            h: robot.slideHeight - 14
+          };
+        }
+        return {
+          x: robot.x + 13,
+          y: robot.y + 10,
+          w: robot.width - 24,
+          h: robot.height - 18
+        };
+      }
+
+      function obstacleBounds(o) {
+        if (o.type === "low") {
+          return { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 };
+        }
+        return { x: o.x + 4, y: o.y + 3, w: o.w - 8, h: o.h - 4 };
+      }
+
+      function intersects(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      }
+
+      function addDust(x, y, amount, lift) {
+        for (let i = 0; i < amount; i++) {
+          state.dust.push({
+            x,
+            y,
+            vx: -90 - Math.random() * 150,
+            vy: -20 - Math.random() * 64 + lift * 36,
+            life: 0.42 + Math.random() * 0.26,
+            max: 0.68,
+            r: 2 + Math.random() * 5
+          });
+        }
+      }
+
+      function burst(x, y, amount) {
+        for (let i = 0; i < amount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 80 + Math.random() * 320;
+          state.sparks.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.45 + Math.random() * 0.45,
+            max: 0.9
+          });
+        }
+      }
+
+      function updateParticles(dt) {
+        for (const p of state.dust) {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 120 * dt;
+          p.life -= dt;
+        }
+        state.dust = state.dust.filter((p) => p.life > 0);
+
+        for (const p of state.sparks) {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 460 * dt;
+          p.life -= dt;
+        }
+        state.sparks = state.sparks.filter((p) => p.life > 0);
+      }
+
+      function draw() {
+        ctx.save();
+        const shakeX = state.shake ? (Math.random() - 0.5) * state.shake : 0;
+        const shakeY = state.shake ? (Math.random() - 0.5) * state.shake * 0.45 : 0;
+        ctx.translate(shakeX, shakeY);
+        drawSky();
+        drawParallax();
+        drawTrack();
+        drawObstacles();
+        drawParticles();
+        drawRobot();
+        drawLightSweep();
+        ctx.restore();
+
+        if (state.flash > 0) {
+          ctx.fillStyle = `rgba(255, 111, 145, ${state.flash * 0.18})`;
+          ctx.fillRect(0, 0, state.width, state.height);
+        }
+      }
+
+      function drawSky() {
+        const sky = ctx.createLinearGradient(0, 0, 0, state.height);
+        sky.addColorStop(0, "#081427");
+        sky.addColorStop(0.46, "#0b2435");
+        sky.addColorStop(1, "#10222c");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (const s of state.stars) {
+          const x = (s.x - state.world * 0.018) % state.width;
+          const px = x < 0 ? x + state.width : x;
+          const twinkle = 0.55 + Math.sin(state.time * 2 + s.x) * 0.28;
+          ctx.fillStyle = `rgba(168, 244, 255, ${s.a * twinkle})`;
+          ctx.beginPath();
+          ctx.arc(px, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        const sunX = state.width * 0.78;
+        const sunY = state.height * 0.2;
+        const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, state.width * 0.34);
+        glow.addColorStop(0, "rgba(93, 232, 255, 0.2)");
+        glow.addColorStop(0.45, "rgba(109, 255, 208, 0.08)");
+        glow.addColorStop(1, "rgba(109, 255, 208, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, state.width, state.height);
+      }
+
+      function drawParallax() {
+        const horizon = state.groundY - 122;
+        ctx.save();
+        for (const b of state.skyline) {
+          const layerWidth = state.skyline.length * 92;
+          let x = (b.x - state.world * 0.13) % layerWidth;
+          if (x < -120) x += layerWidth;
+          const color = b.hue === 0 ? "18, 46, 65" : b.hue === 1 ? "17, 58, 70" : "25, 38, 66";
+          ctx.fillStyle = `rgba(${color}, 0.72)`;
+          roundRect(ctx, x, horizon - b.h, b.w, b.h, 5);
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(93, 232, 255, 0.16)";
+          for (let wy = horizon - b.h + 18; wy < horizon - 10; wy += 24) {
+            ctx.fillRect(x + 9, wy, b.w - 18, 2);
+          }
+        }
+        ctx.restore();
+
+        ctx.strokeStyle = "rgba(93, 232, 255, 0.13)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 9; i++) {
+          const y = horizon + i * 14;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(state.width, y + Math.sin(i) * 5);
+          ctx.stroke();
+        }
+      }
+
+      function drawTrack() {
+        const groundTop = state.groundY;
+        const ground = ctx.createLinearGradient(0, groundTop, 0, state.height);
+        ground.addColorStop(0, "#172d35");
+        ground.addColorStop(0.36, "#10202b");
+        ground.addColorStop(1, "#071018");
+        ctx.fillStyle = ground;
+        ctx.fillRect(0, groundTop, state.width, state.height - groundTop);
+
+        ctx.strokeStyle = "rgba(93, 232, 255, 0.45)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, groundTop + 0.5);
+        ctx.lineTo(state.width, groundTop + 0.5);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(109, 255, 208, 0.16)";
+        ctx.lineWidth = 1;
+        const spacing = 76;
+        const offset = (state.world * 0.74) % spacing;
+        for (let x = -spacing; x < state.width + spacing; x += spacing) {
+          ctx.beginPath();
+          ctx.moveTo(x - offset, groundTop + 28);
+          ctx.lineTo(x - offset + 38, groundTop + 28);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
+        for (let y = groundTop + 56; y < state.height; y += 38) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(state.width, y);
+          ctx.stroke();
+        }
+      }
+
+      function drawRobot() {
+        const sliding = robot.sliding && robot.grounded;
+        const bob = robot.grounded && !sliding ? Math.sin(robot.runPhase * 2) * 3 : 0;
+        const x = robot.x;
+        const y = sliding ? state.groundY - robot.slideHeight + 4 : robot.y + bob;
+        const baseY = robot.grounded ? state.groundY + bob : y + robot.height - 3;
+        const phase = robot.runPhase;
+
+        ctx.save();
+        ctx.shadowColor = "rgba(93, 232, 255, 0.52)";
+        ctx.shadowBlur = 20 + robot.glow * 14;
+
+        if (sliding) {
+          drawRobotSlide(x, y);
+        } else {
+          const jumpPose = !robot.grounded;
+          const legA = jumpPose ? (robot.vy < 0 ? -34 : 24) : Math.sin(phase) * 15;
+          const legB = jumpPose ? (robot.vy < 0 ? 28 : -18) : Math.sin(phase + Math.PI) * 15;
+          const armA = jumpPose ? -34 : -legA * 0.8;
+          const armB = jumpPose ? 28 : -legB * 0.8;
+          drawLeg(x + 22, baseY - 32, legA);
+          drawLeg(x + 45, baseY - 32, legB);
+          drawArm(x + 15, y + 43, armA);
+          drawArm(x + 56, y + 43, armB);
+          drawBody(x + 16, y + 28, 40, 44);
+          drawHead(x + 18, y + 4, 38, 31);
+          drawAntenna(x + 50, y + 3);
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = "rgba(93, 232, 255, 0.11)";
+        ctx.beginPath();
+        ctx.ellipse(x + 34, state.groundY + 7, sliding ? 48 : 35, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawRobotSlide(x, y) {
+        drawLeg(x + 22, state.groundY - 20, -22);
+        drawLeg(x + 49, state.groundY - 18, 20);
+        drawArm(x + 20, y + 33, 22);
+        drawArm(x + 63, y + 33, -18);
+        drawBody(x + 18, y + 20, 56, 28);
+        drawHead(x + 51, y + 4, 32, 25);
+        drawAntenna(x + 78, y + 3);
+      }
+
+      function drawHead(x, y, w, h) {
+        ctx.fillStyle = "#c9f8ff";
+        roundRect(ctx, x, y, w, h, 8);
+        ctx.fill();
+        const visor = ctx.createLinearGradient(x + 5, y + 10, x + w - 4, y + 10);
+        visor.addColorStop(0, "#142c3a");
+        visor.addColorStop(0.45, "#38e8ff");
+        visor.addColorStop(1, "#6dffd0");
+        ctx.fillStyle = visor;
+        roundRect(ctx, x + 6, y + 10, w - 12, 8, 4);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+        ctx.fillRect(x + 13, y + 12, 5, 2);
+      }
+
+      function drawBody(x, y, w, h) {
+        const body = ctx.createLinearGradient(x, y, x + w, y + h);
+        body.addColorStop(0, "#e7fdff");
+        body.addColorStop(0.52, "#7eeeff");
+        body.addColorStop(1, "#2b8fa3");
+        ctx.fillStyle = body;
+        roundRect(ctx, x, y, w, h, 9);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(8, 28, 41, 0.78)";
+        roundRect(ctx, x + 10, y + 13, w - 20, 12, 5);
+        ctx.fill();
+        ctx.fillStyle = "#6dffd0";
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + 19, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawLeg(x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.fillStyle = "#aaf4ff";
+        roundRect(ctx, -7, 0, 14, 27, 5);
+        ctx.fill();
+        ctx.fillStyle = "#5de8ff";
+        roundRect(ctx, -7, 22, 23, 8, 4);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawArm(x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.fillStyle = "#9ff3ff";
+        roundRect(ctx, -5, 0, 10, 29, 5);
+        ctx.fill();
+        ctx.fillStyle = "#6dffd0";
+        ctx.beginPath();
+        ctx.arc(0, 31, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawAntenna(x, y) {
+        ctx.strokeStyle = "#9ff3ff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y + 3);
+        ctx.lineTo(x + 7, y - 10);
+        ctx.stroke();
+        ctx.fillStyle = "#ffd166";
+        ctx.beginPath();
+        ctx.arc(x + 8, y - 11, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawObstacles() {
+        for (const o of state.obstacles) {
+          if (o.type === "low") {
+            drawLowGate(o);
+          } else {
+            drawTallBarrier(o);
+          }
+        }
+      }
+
+      function drawTallBarrier(o) {
+        const pulse = 0.62 + Math.sin(o.pulse) * 0.22;
+        ctx.save();
+        ctx.shadowColor = "rgba(255, 111, 145, 0.46)";
+        ctx.shadowBlur = 18;
+        const grad = ctx.createLinearGradient(o.x, o.y, o.x + o.w, o.y + o.h);
+        grad.addColorStop(0, "#ff6f91");
+        grad.addColorStop(1, "#ffd166");
+        ctx.fillStyle = grad;
+        roundRect(ctx, o.x, o.y, o.w, o.h, 7);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.2 * pulse})`;
+        ctx.fillRect(o.x + 9, o.y + 9, o.w - 18, 3);
+        ctx.fillRect(o.x + 9, o.y + o.h - 16, o.w - 18, 3);
+        ctx.restore();
+      }
+
+      function drawLowGate(o) {
+        const pulse = 0.58 + Math.sin(o.pulse) * 0.24;
+        ctx.save();
+        ctx.shadowColor = "rgba(109, 255, 208, 0.5)";
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = `rgba(109, 255, 208, ${0.68 + pulse * 0.18})`;
+        ctx.lineWidth = 4;
+        roundRect(ctx, o.x, o.y, o.w, o.h, 8);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(109, 255, 208, 0.12)";
+        roundRect(ctx, o.x + 5, o.y + 5, o.w - 10, o.h - 10, 6);
+        ctx.fill();
+        ctx.fillStyle = "rgba(232, 255, 255, 0.86)";
+        ctx.fillRect(o.x + 16, o.y + o.h / 2 - 1, o.w - 32, 2);
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        ctx.save();
+        for (const p of state.dust) {
+          const alpha = Math.max(0, p.life / p.max);
+          ctx.fillStyle = `rgba(156, 229, 219, ${alpha * 0.22})`;
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, p.r * 1.6, p.r, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "lighter";
+        for (const p of state.sparks) {
+          const alpha = Math.max(0, p.life / p.max);
+          ctx.strokeStyle = `rgba(255, 209, 102, ${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - p.vx * 0.025, p.y - p.vy * 0.025);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawLightSweep() {
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        const sweepX = ((state.world * 0.15) % (state.width + 260)) - 260;
+        const grad = ctx.createLinearGradient(sweepX, 0, sweepX + 220, 0);
+        grad.addColorStop(0, "rgba(93, 232, 255, 0)");
+        grad.addColorStop(0.5, "rgba(93, 232, 255, 0.055)");
+        grad.addColorStop(1, "rgba(93, 232, 255, 0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(sweepX, 0, 220, state.height);
+        ctx.restore();
+      }
+
+      function roundRect(context, x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        context.beginPath();
+        context.moveTo(x + radius, y);
+        context.arcTo(x + w, y, x + w, y + h, radius);
+        context.arcTo(x + w, y + h, x, y + h, radius);
+        context.arcTo(x, y + h, x, y, radius);
+        context.arcTo(x, y, x + w, y, radius);
+        context.closePath();
+      }
+
+      function formatScore(value) {
+        return String(Math.floor(value)).padStart(5, "0");
+      }
+
+      function loop(now) {
+        const dt = (now - state.lastTime) / 1000;
+        state.lastTime = now;
+        if (state.status === "running") update(dt);
+        else {
+          state.time += Math.min(dt, 0.032);
+          robot.runPhase += Math.min(dt, 0.032) * 9;
+          state.world += 120 * Math.min(dt, 0.032);
+          updateParticles(Math.min(dt, 0.032));
+        }
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      function bindTouchButton(button, action) {
+        button.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          action();
+        });
+      }
+
+      function bindHoldButton(button, downAction, upAction) {
+        button.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          button.setPointerCapture(event.pointerId);
+          downAction();
+        });
+        button.addEventListener("pointerup", (event) => {
+          event.preventDefault();
+          upAction();
+        });
+        button.addEventListener("pointercancel", upAction);
+        button.addEventListener("lostpointercapture", upAction);
+      }
+
+      window.addEventListener("resize", resize);
+      window.addEventListener("keydown", (event) => {
+        if (event.code === "Space") {
+          event.preventDefault();
+          startOrJump();
+        } else if (event.key.toLowerCase() === "b") {
+          event.preventDefault();
+          beginSlide();
+        } else if (event.key.toLowerCase() === "r") {
+          event.preventDefault();
+          resetGame();
+        }
+      });
+      window.addEventListener("keyup", (event) => {
+        if (event.key.toLowerCase() === "b") {
+          event.preventDefault();
+          endSlide();
+        }
+      });
+      window.addEventListener("blur", endSlide);
+
+      startOverlay.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        startOrJump();
+      });
+      gameOverOverlay.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        resetGame();
+      });
+      restartButton.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        resetGame();
+      });
+      bindTouchButton(jumpButton, startOrJump);
+      bindHoldButton(slideButton, beginSlide, endSlide);
+
+      resize();
+      requestAnimationFrame((time) => {
+        state.lastTime = time;
+        requestAnimationFrame(loop);
+      });
+    })();
+  </script>
+</body>
+</html>
