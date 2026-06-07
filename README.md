@@ -53,4 +53,5 @@ The codebase showcases clean architectural practices for native browser gameplay
 
 ## 📦 Installation & Local Development
 
-No compilation or build steps are necessary! To run this project, just download the file and double click it to play . 
+No compilation or build steps are necessary! To run this project, just download the file and double click it to play through any browser. 
+
